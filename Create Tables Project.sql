@@ -1,4 +1,5 @@
-use Project_For_DB
+
+
 DROP TABLE Retrieved, LiveLanguages, OnlineLanguages, Reviews, Services, Favorites, 
 			LiveExperiences, OnlineExperiences, [SecurityMeasures],
 			Orders,[PaymentMethods], [Searchs], Properties, Locations, Cities, Countries, Products, Customers
@@ -48,9 +49,9 @@ CREATE TABLE Countries(
 CREATE TABLE Products (
 	ProductID int PRIMARY KEY NOT NULL,
 	Price money,
-	HostEmail varchar(50) FOREIGN KEY REFERENCES Customers(Email) NOT NULL
+	HostEmail varchar(50) FOREIGN KEY REFERENCES Customers(Email) NOT NULL,
+	AverageRating real null
 )
-
 
 ALTER TABLE Products ADD CONSTRAINT Ck_Price
 	CHECK (Price > 0)
@@ -61,6 +62,7 @@ CREATE TABLE [Searchs] (
 	Email varchar(50) FOREIGN KEY REFERENCES Customers (Email) ,
 	[DT-search] datetime NOT NULL,
 	type varchar(20),
+	Guests int,
 	[DT-start] date,
 	[DT-end] date,
 	PRIMARY KEY (IPAddress, [DT-search]),
@@ -118,11 +120,7 @@ CREATE TABLE Orders(
 	OrderID int PRIMARY KEY NOT NULL,
 	ProductID int FOREIGN KEY REFERENCES Products(ProductID) NOT NULL,
 	[DT-buy] datetime,
-	IPAddress varchar(20) NOT NULL,
-	[DT-Search] datetime NOT NULL,
 	CreditCardNumber varchar(20),
-	CONSTRAINT FK_IP_AND_DT_Orders FOREIGN KEY (IPAddress, [DT-Search])
-									REFERENCES [Searchs] (IPAddress, [DT-Search]),
 	CONSTRAINT FK_Card_Num_Orders FOREIGN KEY (CreditCardNumber)
 								REFERENCES PaymentMethods (CardNumber)
 )
@@ -159,6 +157,8 @@ CREATE TABLE LiveExperiences(
 	LiveExperienceID int PRIMARY KEY NOT NULL,
 	Description varchar(150),
 	[Duration(min.)] int,
+	Tonnage int,
+	MaxCapacity int,
 	Location int FOREIGN KEY REFERENCES Locations(LocationID),
 	CONSTRAINT FK_ProductID_Live FOREIGN KEY (LiveExperienceID)
 						REFERENCES Products(ProductID)
@@ -205,4 +205,3 @@ CREATE TABLE Favorites (
 	CONSTRAINT FK_Favorites_Product FOREIGN KEY (ProductID)
 					REFERENCES Products(ProductID)
 )
-

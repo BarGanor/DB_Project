@@ -45,16 +45,15 @@ AS BEGIN
 
 
 ----------------------------------------- SP Using CURSOR ------------------------------------
+CREATE PROCEDURE SP_SEND_BIRTHDAY
+AS
 DECLARE
-
 @out_desc VARCHAR(1000),
 @out_mesg VARCHAR(10)
-
 DECLARE @name VARCHAR(20),
 		@birthdate datetime,
 		@email NVARCHAR(50),
 		@body NVARCHAR(1000)
-
 
 DECLARE Birthday_Cursor CURSOR READ_ONLY
 FOR
@@ -75,13 +74,24 @@ BEGIN
       BEGIN
 
             SET @body = 'Happy Birthday ' + @name +
-
             ', Enjoy your special day! '
-
             + 'Sincerely, AirBNB Customer Relationship Department'
 
-            PRINT @body
+			EXEC msdb.dbo.sp_send_dbmail
+				 @profile_name = 'Group_27_profile',
+				 @recipients = 'ganorbar@gmail.com',
+				 @body = @body,
+				 @subject = 'Automated Success Message';
+
+
       END
+	FETCH NEXT FROM Birthday_Cursor INTO @name, @birthdate, @email
+
+
+END
+
+CLOSE Birthday_Cursor
+DEALLOCATE Birthday_Cursor
 
       FETCH NEXT FROM Birthday_Cursor INTO @name, @birthdate, @email
 END

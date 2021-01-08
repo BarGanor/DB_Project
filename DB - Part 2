@@ -98,3 +98,54 @@ END
 
 CLOSE Birthday_Cursor
 DEALLOCATE Birthday_Cursor
+
+
+------------------------------------- Combined Methods Function -----------------------------
+CREATE PROCEDURE SP_mail_past_customers
+AS
+DECLARE @email NVARCHAR(50),
+		@name VARCHAR(20),
+		@body NVARCHAR(1000)
+DECLARE Past_Customers_Cursor CURSOR READ_ONLY
+FOR
+SELECT C.Email, [Name]=[Name-first]+ ' ' + [Name-last]
+FROM Customers AS C JOIN Searchs AS S ON C.Email = S.Email 
+JOIN [PaymentMethods] AS PM ON S.[DT-search] = PM.[dt-search]
+AND S.IPAddress = PM.IPAddress JOIN Orders AS O ON
+PM.CardNumber= O.CreditCardNumber
+WHERE C.Email NOT  IN (
+			SELECT C.Email
+			FROM Customers AS C JOIN Searchs AS S ON C.Email = S.Email 
+			JOIN [paymentmethods] AS PM ON S.[DT-search] = PM.[dt-search]
+			AND S.IPAddress = PM.IPAddress
+			JOIN Orders AS O ON PM.CardNumber= O.CreditCardNumber
+			WHERE YEAR(O.[DT-buy])=2020 AND YEAR(O.[DT-buy])=2021 
+			)
+
+GROUP BY C.Email, [Name-first], [Name-last]
+HAVING COUNT( O.OrderID ) > 10
+
+OPEN Past_Customers_Cursor
+
+FETCH NEXT FROM Past_Customers_Cursor INTO @email, @name
+
+WHILE @@FETCH_STATUS = 0
+
+BEGIN
+        SET @body = 'Hey ' + @name +
+        ', Long time no see!' + CHAR(13)+CHAR(10) +
+        + 'Your opinion matters to us, please take 3 minutes to give us some feedback!'+ CHAR(13)+CHAR(10) +
+		+ 'Link: https://www.airbnb.com/help/feedback'
+
+	EXEC msdb.dbo.sp_send_dbmail
+		 @profile_name = 'Group_27',
+		 @recipients = 'graziani7595@gmail.com',
+		 @body = @body,
+		 @subject = 'Hey, we miss you';
+
+	print @body
+	FETCH NEXT FROM Past_Customers_Cursor INTO @email, @name
+END
+CLOSE Past_Customers_Cursor
+DEALLOCATE Past_Customers_Cursor
+

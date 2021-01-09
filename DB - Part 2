@@ -1,51 +1,55 @@
------------------------- Simple Stored Procedure ---------------------
-CREATE PROCEDURE Delete_Expired_Cards @Date datetime
-AS 
-	Delete from PaymentMethods
-	where dateadd(m,1,cast(STUFF(ExperationDate,3,0,'/01') as datetime))-1 < @Date
 
-
-
-alter table products add [Average Rating] real
-select P.ProductID, COUNT(O.OrderID), avg_rating= SUM(R.Rating)/CAST(COUNT(O.OrderID) as real)
-from Reviews as R join Orders as O on r.orderID=o.OrderID
-JOIN Products AS P on P.ProductID=o.ProductID
-GROUP BY P.ProductID
-
------------------------- Simple Trigger ---------------------
-alter table products add [average rating] real
-CREATE TRIGGER Update_Rating
-		ON Reviews
-		FOR INSERT 
+CREATE PROCEDURE [dbo].[SP_mail_past_customers]
 AS
-UPDATE Products
-Set [Average Rating]=(
-						select SUM(R.Rating)/CAST(COUNT(O.OrderID) as real)
-						from Reviews as R join Orders as O on r.orderID=o.OrderID
-						JOIN Products AS P on P.ProductID=o.ProductID
-						WHERE Products.ProductID = O.ProductID
-						GROUP BY P.ProductID
-					)
-WHERE ProductID in (select distinct ProductID from inserted)
+DECLARE @email NVARCHAR(50),
+		@name VARCHAR(20),
+		@body NVARCHAR(1000)
+DECLARE Past_Customers_Cursor CURSOR READ_ONLY
+FOR
+SELECT C.Email, [Name]=[Name-first]+ ' ' + [Name-last]
+FROM Customers AS C JOIN Searchs AS S ON C.Email = S.Email 
+JOIN [PaymentMethods] AS PM ON S.[DT-search] = PM.[dt-search]
+AND S.IPAddress = PM.IPAddress JOIN Orders AS O ON
+PM.CardNumber= O.CreditCardNumber
+WHERE C.Email NOT  IN (
+			SELECT C.Email
+			FROM Customers AS C JOIN Searchs AS S ON C.Email = S.Email 
+			JOIN [paymentmethods] AS PM ON S.[DT-search] = PM.[dt-search]
+			AND S.IPAddress = PM.IPAddress
+			JOIN Orders AS O ON PM.CardNumber= O.CreditCardNumber
+			WHERE YEAR(O.[DT-buy])=2020 AND YEAR(O.[DT-buy])=2021 
+			)
 
------------------------- Scalar Function ---------------------
-create function Best_Property_In_City(@city varchar(20))
-Returns int
-AS BEGIN
-	DECLARE @Best_Product int
-	select top 1 @Best_Product= p.ProductID
-	from Products as p join Properties AS Prop on p.ProductID=prop.PropertyID
-	join Locations as L on L.LocationID=Prop.Location 
-	where L.City=@city
-	group by P.ProductID, p.[Average Rating]
-	order by p.[Average Rating] desc
-	RETURN @Best_PRODUCT
-	END
+GROUP BY C.Email, [Name-first], [Name-last]
+HAVING COUNT( O.OrderID ) > 10
 
+OPEN Past_Customers_Cursor
 
+FETCH NEXT FROM Past_Customers_Cursor INTO @email, @name
 
------------------------------------------ SP Using CURSOR ------------------------------------
-CREATE PROCEDURE SP_SEND_BIRTHDAY
+WHILE @@FETCH_STATUS = 0
+
+BEGIN
+        SET @body = 'Hey ' + @name +
+        ', Long time no see!' + CHAR(13)+CHAR(10) +
+        + 'Your opinion matters to us, please take 3 minutes to give us some feedback!'+ CHAR(13)+CHAR(10) +
+		+ 'Link: https://www.airbnb.com/help/feedback'
+
+	EXEC msdb.dbo.sp_send_dbmail
+		 @profile_name = 'Group_27',
+		 @recipients = 'graziani7595@gmail.com',
+		 @body = @body,
+		 @subject = 'Automated Success Message';
+
+	print @body
+	FETCH NEXT FROM Past_Customers_Cursor INTO @email, @name
+END
+CLOSE Past_Customers_Cursor
+DEALLOCATE Past_Customers_Cursor
+
+-----------------------------------------------------------------------------------------------------------------
+
+CREATE PROCEDURE [dbo].[SP_SEND_BIRTHDAY]
 AS
 DECLARE
 @out_desc VARCHAR(1000),
@@ -93,59 +97,4 @@ END
 CLOSE Birthday_Cursor
 DEALLOCATE Birthday_Cursor
 
-      FETCH NEXT FROM Birthday_Cursor INTO @name, @birthdate, @email
-END
-
-CLOSE Birthday_Cursor
-DEALLOCATE Birthday_Cursor
-
-
-------------------------------------- Combined Methods Function -----------------------------
-CREATE PROCEDURE SP_mail_past_customers
-AS
-DECLARE @email NVARCHAR(50),
-		@name VARCHAR(20),
-		@body NVARCHAR(1000)
-DECLARE Past_Customers_Cursor CURSOR READ_ONLY
-FOR
-SELECT C.Email, [Name]=[Name-first]+ ' ' + [Name-last]
-FROM Customers AS C JOIN Searchs AS S ON C.Email = S.Email 
-JOIN [PaymentMethods] AS PM ON S.[DT-search] = PM.[dt-search]
-AND S.IPAddress = PM.IPAddress JOIN Orders AS O ON
-PM.CardNumber= O.CreditCardNumber
-WHERE C.Email NOT  IN (
-			SELECT C.Email
-			FROM Customers AS C JOIN Searchs AS S ON C.Email = S.Email 
-			JOIN [paymentmethods] AS PM ON S.[DT-search] = PM.[dt-search]
-			AND S.IPAddress = PM.IPAddress
-			JOIN Orders AS O ON PM.CardNumber= O.CreditCardNumber
-			WHERE YEAR(O.[DT-buy])=2020 AND YEAR(O.[DT-buy])=2021 
-			)
-
-GROUP BY C.Email, [Name-first], [Name-last]
-HAVING COUNT( O.OrderID ) > 10
-
-OPEN Past_Customers_Cursor
-
-FETCH NEXT FROM Past_Customers_Cursor INTO @email, @name
-
-WHILE @@FETCH_STATUS = 0
-
-BEGIN
-        SET @body = 'Hey ' + @name +
-        ', Long time no see!' + CHAR(13)+CHAR(10) +
-        + 'Your opinion matters to us, please take 3 minutes to give us some feedback!'+ CHAR(13)+CHAR(10) +
-		+ 'Link: https://www.airbnb.com/help/feedback'
-
-	EXEC msdb.dbo.sp_send_dbmail
-		 @profile_name = 'Group_27',
-		 @recipients = 'graziani7595@gmail.com',
-		 @body = @body,
-		 @subject = 'Hey, we miss you';
-
-	print @body
-	FETCH NEXT FROM Past_Customers_Cursor INTO @email, @name
-END
-CLOSE Past_Customers_Cursor
-DEALLOCATE Past_Customers_Cursor
 
